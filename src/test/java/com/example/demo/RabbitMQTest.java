@@ -23,7 +23,12 @@ public class RabbitMQTest {
     // 测试 基本消息模型，消息内容为 字符串
     @Test
     public void testBasicMessageModel() {
-        String msgStr = "kjhgfd";
-        basicPublisher.sendMsg(msgStr, Dto.builder().build());
+        Integer i = 2;
+        int j = 0;
+        synchronized (i){
+
+        }
+//        String msgStr = "kjhgfd";
+//        basicPublisher.sendMsg(msgStr, Dto.builder().build());
     }
 }

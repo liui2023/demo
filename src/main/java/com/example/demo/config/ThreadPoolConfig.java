@@ -1,5 +1,7 @@
 package com.example.demo.config;
 
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.concurrent.*;
@@ -10,8 +12,10 @@ import java.util.concurrent.atomic.AtomicInteger;
  * @Date 2023/6/5  14:45
  * @Desc 又是充满希望的一天
  */
+@Configuration
 public class ThreadPoolConfig {
 
+    @Bean("myThread")
     public ThreadPoolTaskExecutor executor(){
 
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
