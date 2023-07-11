@@ -1,5 +1,7 @@
 package com.example.demo;
 
+import com.example.demo.dto.UserDTO;
+import com.example.demo.factory.BaseFactory;
 import com.example.demo.test.TestA;
 import com.example.demo.test.TestB;
 import org.mybatis.spring.annotation.MapperScan;
@@ -47,6 +49,7 @@ public class DemoApplication {
             }
         }).start();
     }
+
 
 
     public static void main(String[] args) {
