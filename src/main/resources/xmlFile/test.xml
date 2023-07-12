@@ -1,0 +1,154 @@
+<xml>
+    <!-- （新模式）用信查询接口 + 还款计划查询
+     -->
+    <http-invoke ref="zbHttpClient"/>
+    <txn-flow-def id="C029_loanQuery" txnType="01000" productType="CASH_LOAN">
+        <!-- 查询payTxnCtrl记录 -->
+        <prepare-data id="loanTxn" className="com.ly.fn.biz.ins.bgw.payment.api.IQueryPayTxnCtrlService"
+                      methodName="queryPayTxnCtrlByTxnId" type="lnk">
+            <arg-paths>
+                <value type="string">${req.txnId}</value>
+            </arg-paths>
+        </prepare-data>
+        <!-- 查询payTxnCtrl记录 -->
+
+        <!-- 解密身份证号 -->
+        <prepare-data id="idCardNo" className="com.ly.fn.biz.ins.bgw.platform.srv.service.SimpleCryptoService"
+                      methodName="decryptDataFromHex" type="spring">
+            <arg-paths>
+                <value type="string">${loanTxn.encIdCardNo}</value>
+            </arg-paths>
+        </prepare-data>
+        <!-- 解密身份证号 -->
+
+        <!-- 请求中 txnSrlNo,request_no  -->
+        <prepare-data id="txnSrlNo" className="com.ly.fn.biz.ins.bgw.platform.srv.service.GenCodeService"
+                      methodName="genSeqNo" type="spring">
+            <arg-paths>
+                <value type="string">biz_ins_bgw_platform_zbbank_serialNo</value>
+                <value type="int">16</value>
+            </arg-paths>
+        </prepare-data>
+        <prepare-data id="requestNo" className="com.ly.fn.biz.ins.bgw.platform.srv.service.GenCodeService"
+                      methodName="genSeqNo" type="spring">
+            <arg-paths>
+                <value type="string">biz_ins_bgw_platform_zbbank_serialNo</value>
+                <value type="int">16</value>
+            </arg-paths>
+        </prepare-data>
+        <!-- 请求中 txnSrlNo,request_no  -->
+
+        <!-- 请求中时间戳  -->
+        <prepare-data id="TxnDt" className="com.ly.fn.biz.ins.util.DateUtil" methodName="currDateToStr" type="static">
+            <arg-paths>
+                <value type="string">yyyy-MM-dd</value>
+            </arg-paths>
+        </prepare-data>
+        <prepare-data id="TxnTs" className="com.ly.fn.biz.ins.util.DateUtil" methodName="currDateToStr" type="static">
+            <arg-paths>
+                <value type="string">HHmmssSSS</value>
+            </arg-paths>
+        </prepare-data>
+        <!-- 请求中时间戳  -->
+
+        <flow-steps>
+            <!-- 用信查询接口   -->
+            <flow-step ref="C029_loanQuery_flow"/>
+            <!-- 保存合同记录  -->
+            <flow-step ref="C029_saveLoanContractCtrl_groovy"/>
+            <!-- 查询还款计划  -->
+            <flow-step ref="C029_loanQuerySchedule_flow"/>
+        </flow-steps>
+    </txn-flow-def>
+    <flow-step-def id="C029_loanQuery_flow" url="${configParam.apiHostUrl}/NormLanStsQry">
+        <req>
+            <prop name="request" type="obj">
+                <obj>
+                    <!-- 交易流水号    -->
+                    <prop name="TxnSrlNo" value="${configParam.partner}${txnSrlNo}" type="string"/>
+                    <!-- 交易编号;默认：SE0110    -->
+                    <prop name="TranNo" value="SE0110" type="string"/>
+                    <!-- 交易日期;格式：YYYYMMDD
+                        交易时间戳;格式：HHMMSSNNN; -->
+                    <prop name="TxnDt" value="${TxnDt}" type="string"/>
+                    <prop name="TxnTs" value="${TxnTs}" type="string"/>
+                    <!-- 渠道唯一标识  -->
+                    <prop name="partner" value="${configParam.partner}" type="string"/>
+                    <!-- 用户唯一标识  -->
+                    <!-- <prop name="open_id" value="${configParam.partner}${idCardNo}" type="string"/>-->
+                    <!-- 借款请求号 -->
+                    <prop name="loan_request_no" value="${req.txnId}" type="string"/>
+
+                </obj>
+            </prop>
+        </req>
+        <resp>
+            <prop name="gateRespCode" type="string">
+                <case>
+                    <when test="'${resp.code}' != '000000'">TXN.001</when>
+                    <!-- 放款成功  -->
+                    <when test="'${resp.code}' == '000000' and '${resp.result.loan_status}' == '1' ">TXN.000</when>
+                    <!-- 放款失败  -->
+                    <when test="'${resp.code}' == '000000' and '${resp.result.loan_status}' == '2' ">BGW.012</when>
+                    <!-- 放款失败  -->
+                    <when test="'${resp.code}' == '000000' and '${resp.result.loan_status}' == '3' ">BGW.012</when>
+                    <else>TXN.001</else>
+                </case>
+            </prop>
+            <prop name="gateRespMsg" value="${resp.msg}" type="string"/>
+            <!-- 借据号  -->
+            <prop name="gateTxnId" value="${resp.result.partner_loan_no}" type="string"/>
+            <!-- 放款成功时间：起息日  -->
+            <prop name="gateTxnTime" value="$dateParse(resp.result.value_date, yyyyMMdd)" type="date"/>
+        </resp>
+    </flow-step-def>
+    <flow-step-def id="C029_loanQuerySchedule_flow" url="${configParam.apiHostUrl}/NormRpymntPlntQry">
+        <req>
+            <prop name="request" type="obj">
+                <obj>
+                    <!-- 交易流水号    -->
+                    <prop name="TxnSrlNo" value="${configParam.partner}${txnSrlNo}" type="string"/>
+                    <!-- 交易编号;默认：SE0100    -->
+                    <prop name="TranNo" value="SE0130" type="string"/>
+                    <!-- 交易日期;格式：YYYYMMDD
+                        交易时间戳;格式：HHMMSSNNN; -->
+                    <prop name="TxnDt" value="${TxnDt}" type="string"/>
+                    <prop name="TxnTs" value="${TxnTs}" type="string"/>
+                    <!-- 渠道唯一标识  -->
+                    <prop name="partner" value="${configParam.partner}" type="string"/>
+                    <!-- 用户唯一标识  -->
+                    <prop name="open_id" value="${configParam.partner}${idCardNo}" type="string"/>
+                    <!-- 借据号 -->
+                    <prop name="partner_loan_no" value="${resp.result.partner_loan_no}" type="string"/>
+                </obj>
+            </prop>
+        </req>
+        <resp>
+            <prop name="gateRespCode" type="string">
+                <case>
+                    <when test="'${resp.code}' == '000000'">TXN.000</when>
+                    <else>TXN.001</else>
+                </case>
+            </prop>
+            <!-- 还款计划 -->
+            <prop name="repayScheduleList" type="list" value="${resp.result.repay_plan}" var="repayPlan">
+                <list>
+                    <!--期数 -->
+                    <prop name="instalNum" value="${repayPlan.term_no1}" type="int"/>
+                    <!--应还日期 -->
+                    <prop name="repayDate" value="$dateParse(repayPlan.repay_date, yyyyMMdd)" type="date"/>
+                    <!--状态 0-未还；1-已还；2-逾期-->
+                    <prop name="status" type="int" value="0"/>
+                    <!-- 应还本金、利息、总金额   -->
+                    <prop name="repayBalance" value="${repayPlan.principal1}" convert="moneyToLong"/>
+                    <prop name="repayInterest" value="${repayPlan.interest1}" convert="moneyToLong"/>
+                    <prop name="repayAmt" value="${repayPlan.principal1}+${repayPlan.interest1}"
+                          convert="moneyToLong"/>
+                    <!-- 剩余本金、利息  -->
+                    <prop name="remainBalance" value="${repayPlan.principal1}" convert="moneyToLong"/>
+                    <prop name="remainInterest" value="${repayPlan.interest1}" convert="moneyToLong"/>
+                </list>
+            </prop>
+        </resp>
+    </flow-step-def>
+</xml>

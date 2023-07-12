@@ -14,6 +14,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TestA {
 
+    private static final int i = 0;
+
     @Autowired
     private TestMapper testMapper;
 
