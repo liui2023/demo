@@ -1,0 +1,1 @@
+println("ScriptEngineManager test : hello world");
